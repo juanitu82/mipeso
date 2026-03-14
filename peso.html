@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Tracker de peso</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #f5f3ee;
+    --surface: #ffffff;
+    --surface2: #f0ede6;
+    --border: rgba(0,0,0,0.08);
+    --border-strong: rgba(0,0,0,0.15);
+    --text: #1a1a18;
+    --text2: #6b6860;
+    --text3: #a09e99;
+    --green: #3a6b10;
+    --green-light: #e8f3da;
+    --green-mid: #97c459;
+    --blue: #174f96;
+    --blue-light: #e4eef8;
+    --red: #8f2c1c;
+    --red-light: #faeae7;
+    --accent: #c8a96e;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  /* LAYOUT */
+  .layout { max-width: 720px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+
+  /* HEADER */
+  .app-header { margin-bottom: 2.5rem; }
+  .app-header h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 2rem;
+    font-weight: 400;
+    color: var(--text);
+    line-height: 1.2;
+    margin-bottom: 4px;
+  }
+  .app-header p { font-size: 13px; color: var(--text3); }
+  .app-header .route {
+    display: inline-flex; align-items: center; gap: 8px;
+    margin-top: 10px; font-size: 13px; color: var(--text2);
+    background: var(--surface); border: 0.5px solid var(--border-strong);
+    border-radius: 99px; padding: 5px 14px;
+  }
+  .route .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+
+  /* TABS */
+  .tabs { display: flex; gap: 2px; margin-bottom: 1.75rem; background: var(--surface2); border-radius: var(--radius); padding: 4px; }
+  .tab {
+    flex: 1; padding: 8px; font-size: 13px; font-weight: 500; cursor: pointer;
+    border: none; background: none; color: var(--text2);
+    border-radius: var(--radius-sm); transition: all .15s;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+
+  /* SECTION */
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* METRIC CARDS */
+  .metrics-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 1.25rem; }
+  @media(min-width:520px){ .metrics-grid { grid-template-columns: repeat(4, 1fr); } }
+  .metric-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
+  .metric-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+  .metric-value { font-size: 24px; font-weight: 300; color: var(--text); line-height: 1; }
+  .metric-value span { font-size: 13px; color: var(--text3); }
+  .metric-sub { font-size: 11px; color: var(--text3); margin-top: 5px; }
+  .metric-sub.good { color: var(--green); }
+
+  /* CARD */
+  .card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 1.25rem 1.5rem; margin-bottom: 1rem; }
+  .card-title { font-size: 11px; font-weight: 500; color: var(--text3); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 1rem; }
+
+  /* PROGRESS */
+  .prog-label { font-size: 13px; color: var(--text2); margin-bottom: 6px; display: flex; justify-content: space-between; }
+  .prog-track { background: var(--surface2); border-radius: 99px; height: 7px; overflow: hidden; margin-bottom: 14px; }
+  .prog-fill { height: 100%; border-radius: 99px; transition: width .5s ease; }
+  .prog-fill.kg { background: var(--green); }
+  .prog-fill.cm { background: var(--blue); }
+
+  /* STATS */
+  .stat-row { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 0; border-bottom: 0.5px solid var(--border); font-size: 13px; }
+  .stat-row:last-child { border-bottom: none; }
+  .slabel { color: var(--text2); }
+  .sval { font-weight: 500; }
+
+  /* FORM */
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-group label { font-size: 12px; color: var(--text2); font-weight: 500; }
+  .form-group input, .form-group select {
+    padding: 9px 12px; border: 0.5px solid var(--border-strong);
+    border-radius: var(--radius-sm); background: var(--bg);
+    color: var(--text); font-size: 14px; font-family: inherit;
+    transition: border-color .15s;
+  }
+  .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--green); }
+
+  .btn {
+    padding: 10px 20px; border: 0.5px solid var(--border-strong);
+    border-radius: var(--radius-sm); background: var(--surface);
+    color: var(--text); font-size: 13px; font-weight: 500;
+    cursor: pointer; font-family: inherit; transition: all .15s;
+  }
+  .btn:hover { background: var(--surface2); }
+  .btn-primary { background: var(--text); color: var(--surface); border-color: var(--text); }
+  .btn-primary:hover { opacity: .85; }
+  .btn-danger { color: var(--red); border-color: rgba(143,44,28,.25); }
+  .btn-danger:hover { background: var(--red-light); }
+
+  /* ALERT */
+  .alert {
+    background: var(--green-light); border: 0.5px solid var(--green-mid);
+    border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px;
+    color: var(--green); margin-bottom: 1rem;
+    display: none; animation: fadein .2s ease;
+  }
+  @keyframes fadein { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
+
+  /* HISTORIAL */
+  .entries-list { display: flex; flex-direction: column; gap: 6px; }
+  .entry-row {
+    display: grid; grid-template-columns: 96px 1fr 1fr 1fr auto;
+    gap: 8px; align-items: center; padding: 10px 12px;
+    background: var(--bg); border-radius: var(--radius-sm); font-size: 13px;
+  }
+  .entry-date { color: var(--text3); font-size: 12px; }
+  .entry-badge { font-size: 11px; padding: 2px 7px; border-radius: 99px; }
+  .badge-semanal { background: var(--blue-light); color: var(--blue); }
+  .badge-mensual { background: var(--green-light); color: var(--green); }
+  .delta-good { color: var(--green); font-size: 12px; }
+  .delta-bad { color: var(--red); font-size: 12px; }
+  .del-btn {
+    background: none; border: none; cursor: pointer;
+    color: var(--text3); font-size: 15px; padding: 2px 6px;
+    border-radius: var(--radius-sm); transition: all .1s;
+  }
+  .del-btn:hover { background: var(--red-light); color: var(--red); }
+  .empty { font-size: 13px; color: var(--text3); text-align: center; padding: 2.5rem; }
+
+  /* CHART */
+  .chart-wrap { position: relative; width: 100%; }
+
+  /* NOTA */
+  .nota-text { font-size: 11px; color: var(--text3); font-style: italic; }
+
+  /* INFO */
+  .info-box { background: var(--blue-light); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 12px; color: var(--blue); margin-bottom: 1rem; line-height: 1.6; }
+
+  .section-sep { height: 1px; background: var(--border); margin: 1.5rem 0; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <div class="app-header">
+    <h1>Mi camino</h1>
+    <p>Seguimiento de peso y cintura</p>
+    <div class="route">
+      <span class="dot"></span>
+      145 kg → 100 kg &nbsp;·&nbsp; 137 cm → 100 cm &nbsp;·&nbsp; ~18 meses
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('dashboard',this)">Resumen</button>
+    <button class="tab" onclick="showTab('registro',this)">Registrar</button>
+    <button class="tab" onclick="showTab('historial',this)">Historial</button>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="tab-dashboard" class="section active">
+    <div class="metrics-grid" id="metrics-top"></div>
+
+    <div class="card">
+      <div class="card-title">Progreso hacia la meta</div>
+      <div class="prog-label"><span id="plabel-kg"></span><span id="ppct-kg" style="font-weight:500;"></span></div>
+      <div class="prog-track"><div class="prog-fill kg" id="bar-kg" style="width:0%"></div></div>
+      <div class="prog-label"><span id="plabel-cm"></span><span id="ppct-cm" style="font-weight:500;"></span></div>
+      <div class="prog-track"><div class="prog-fill cm" id="bar-cm" style="width:0%"></div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Evolución de peso (kg)</div>
+      <div class="chart-wrap" style="height:220px;"><canvas id="chartKg"></canvas></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Evolución de cintura (cm)</div>
+      <div class="chart-wrap" style="height:170px;"><canvas id="chartCm"></canvas></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Estadísticas</div>
+      <div id="stats-content"></div>
+    </div>
+  </div>
+
+  <!-- REGISTRO -->
+  <div id="tab-registro" class="section">
+    <div class="alert" id="alert-ok">✓ Registro guardado correctamente.</div>
+    <div class="card">
+      <div class="card-title">Nuevo registro</div>
+      <div class="form-row">
+        <div class="form-group"><label>Fecha</label><input type="date" id="inp-fecha"/></div>
+        <div class="form-group"><label>Tipo</label>
+          <select id="inp-tipo">
+            <option value="semanal">Semanal</option>
+            <option value="mensual">Mensual</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Peso (kg)</label><input type="number" id="inp-kg" placeholder="ej. 141.5" step="0.1" min="40" max="300"/></div>
+        <div class="form-group"><label>Cintura (cm) — opcional</label><input type="number" id="inp-cm" placeholder="ej. 134" step="0.5" min="50" max="200"/></div>
+      </div>
+      <div class="form-group" style="margin-bottom:16px;">
+        <label>Nota (opcional)</label>
+        <input type="text" id="inp-nota" placeholder="ej. semana difícil, mucho trabajo..."/>
+      </div>
+      <button class="btn btn-primary" onclick="guardarRegistro()">Guardar registro</button>
+    </div>
+  </div>
+
+  <!-- HISTORIAL -->
+  <div id="tab-historial" class="section">
+    <div class="card">
+      <div class="card-title">Todos los registros</div>
+      <div class="entries-list" id="lista-entradas"><div class="empty">Sin registros aún.</div></div>
+      <div class="section-sep"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn" onclick="exportCSV()">Exportar CSV</button>
+        <button class="btn btn-danger" onclick="borrarTodo()">Borrar todo</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const IKG=145, MKG=100, ICM=137, MCM=100;
+const KEY='peso_tracker_v1';
+let entries=[], chartKg=null, chartCm=null;
+
+function load(){ try{ const r=localStorage.getItem(KEY); if(r) entries=JSON.parse(r); }catch(e){ entries=[]; } }
+function save(){ localStorage.setItem(KEY, JSON.stringify(entries)); }
+function sorted(){ return [...entries].sort((a,b)=>new Date(a.fecha)-new Date(b.fecha)); }
+function fmt(n,d=1){ return Number(n).toFixed(d); }
+function pct(v,i,m){ return Math.min(100,Math.max(0,((i-v)/(i-m))*100)); }
+
+function showTab(t, btn){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+t).classList.add('active');
+  btn.classList.add('active');
+  if(t==='dashboard') renderDashboard();
+  if(t==='historial') renderHistorial();
+}
+
+function renderDashboard(){
+  const s=sorted();
+  const last=s[s.length-1];
+  const curKg=last?(last.kg??IKG):IKG;
+  const curCm=last?(last.cm??ICM):ICM;
+  const bajKg=IKG-curKg;
+  const bajCm=ICM-curCm;
+  const pKg=pct(curKg,IKG,MKG);
+  const pCm=pct(curCm,ICM,MCM);
+
+  document.getElementById('metrics-top').innerHTML=`
+    <div class="metric-card">
+      <div class="metric-label">Peso actual</div>
+      <div class="metric-value">${fmt(curKg)}<span> kg</span></div>
+      <div class="metric-sub ${bajKg>0?'good':''}">${bajKg>0?'▼ '+fmt(bajKg)+' kg bajados':'Sin cambios aún'}</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Cintura actual</div>
+      <div class="metric-value">${fmt(curCm,0)}<span> cm</span></div>
+      <div class="metric-sub ${bajCm>0?'good':''}">${bajCm>0?'▼ '+fmt(bajCm,0)+' cm menos':'Sin cambios aún'}</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Progreso peso</div>
+      <div class="metric-value">${fmt(pKg,0)}<span>%</span></div>
+      <div class="metric-sub">Faltan ${fmt(curKg-MKG)} kg</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Progreso cintura</div>
+      <div class="metric-value">${fmt(pCm,0)}<span>%</span></div>
+      <div class="metric-sub">Faltan ${fmt(curCm-MCM,0)} cm</div>
+    </div>
+  `;
+
+  document.getElementById('plabel-kg').textContent=`Peso: ${fmt(curKg)} kg → meta ${MKG} kg`;
+  document.getElementById('ppct-kg').textContent=fmt(pKg,0)+'%';
+  document.getElementById('bar-kg').style.width=pKg+'%';
+  document.getElementById('plabel-cm').textContent=`Cintura: ${fmt(curCm,0)} cm → meta ${MCM} cm`;
+  document.getElementById('ppct-cm').textContent=fmt(pCm,0)+'%';
+  document.getElementById('bar-cm').style.width=pCm+'%';
+
+  const labels=['Inicio',...s.map(e=>e.fecha.slice(5))];
+  const dKg=[IKG,...s.map(e=>e.kg??null)];
+  const dCm=[ICM,...s.map(e=>e.cm??null)];
+
+  if(chartKg) chartKg.destroy();
+  chartKg=new Chart(document.getElementById('chartKg'),{
+    type:'line',
+    data:{labels, datasets:[
+      {data:dKg, borderColor:'#3a6b10', backgroundColor:'rgba(58,107,16,0.07)', tension:0.35, pointRadius:5, pointBackgroundColor:'#3a6b10', fill:true, borderWidth:2},
+      {data:labels.map(()=>MKG), borderColor:'#97c459', borderDash:[5,4], pointRadius:0, borderWidth:1.5, fill:false}
+    ]},
+    options:{responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>`${ctx.parsed.y} kg`}}},
+      scales:{
+        y:{min:MKG-5, max:IKG+3, ticks:{font:{size:11}, color:'#a09e99'}, grid:{color:'rgba(0,0,0,0.04)'}},
+        x:{ticks:{font:{size:11}, color:'#a09e99', autoSkip:true, maxTicksLimit:12}, grid:{display:false}}
+      }
+    }
+  });
+
+  if(chartCm) chartCm.destroy();
+  chartCm=new Chart(document.getElementById('chartCm'),{
+    type:'line',
+    data:{labels, datasets:[
+      {data:dCm, borderColor:'#174f96', backgroundColor:'rgba(23,79,150,0.06)', tension:0.35, pointRadius:5, pointBackgroundColor:'#174f96', fill:true, borderWidth:2},
+      {data:labels.map(()=>MCM), borderColor:'#85b7eb', borderDash:[5,4], pointRadius:0, borderWidth:1.5, fill:false}
+    ]},
+    options:{responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>`${ctx.parsed.y} cm`}}},
+      scales:{
+        y:{min:MCM-5, max:ICM+3, ticks:{font:{size:11}, color:'#a09e99'}, grid:{color:'rgba(0,0,0,0.04)'}},
+        x:{ticks:{font:{size:11}, color:'#a09e99', autoSkip:true, maxTicksLimit:12}, grid:{display:false}}
+      }
+    }
+  });
+
+  renderStats(s, curKg, curCm);
+}
+
+function renderStats(s, curKg, curCm){
+  const el=document.getElementById('stats-content');
+  if(s.length===0){ el.innerHTML='<div class="empty">Registrá tu primera medición para ver estadísticas.</div>'; return; }
+
+  const first=s[0], last=s[s.length-1];
+  const bajadaTotal=IKG-curKg;
+  const msRango=new Date(last.fecha)-new Date(first.fecha);
+  const diasRango=msRango/86400000;
+
+  let promHtml='', estHtml='';
+
+  if(diasRango < 1){
+    promHtml=`<div class="stat-row"><span class="slabel">Promedio semanal</span><span class="sval" style="color:#a09e99;font-weight:400;">Necesitás registros en distintas fechas</span></div>`;
+  } else {
+    const semanas=diasRango/7;
+    const prom=bajadaTotal/semanas;
+    const kgRest=curKg-MKG;
+    const semanasEst=prom>0?Math.round(kgRest/prom):null;
+    promHtml=`
+      <div class="stat-row"><span class="slabel">Semanas transcurridas</span><span class="sval">${fmt(semanas,1)}</span></div>
+      <div class="stat-row"><span class="slabel">Promedio semanal</span><span class="sval">${fmt(prom,2)} kg/semana</span></div>`;
+    if(semanasEst) estHtml=`<div class="stat-row"><span class="slabel">Estimación a este ritmo</span><span class="sval">~${semanasEst} semanas &nbsp;(${fmt(semanasEst/4.33,1)} meses)</span></div>`;
+  }
+
+  let mejorBajada=null;
+  for(let i=1;i<s.length;i++){
+    const d=s[i-1].kg-s[i].kg;
+    if(d>0&&(mejorBajada===null||d>mejorBajada.d)) mejorBajada={d, fecha:s[i].fecha};
+  }
+
+  el.innerHTML=`
+    <div class="stat-row"><span class="slabel">Registros cargados</span><span class="sval">${s.length}</span></div>
+    <div class="stat-row"><span class="slabel">Bajada total desde el inicio</span><span class="sval">${fmt(bajadaTotal)} kg</span></div>
+    ${promHtml}
+    <div class="stat-row"><span class="slabel">Kg restantes para la meta</span><span class="sval">${fmt(curKg-MKG)} kg</span></div>
+    ${estHtml}
+    ${mejorBajada?`<div class="stat-row"><span class="slabel">Mejor registro individual</span><span class="sval">▼ ${fmt(mejorBajada.d)} kg &nbsp;(${mejorBajada.fecha})</span></div>`:''}
+  `;
+}
+
+function renderHistorial(){
+  const s=sorted().reverse();
+  const el=document.getElementById('lista-entradas');
+  if(s.length===0){ el.innerHTML='<div class="empty">Sin registros aún.</div>'; return; }
+  const all=sorted();
+  el.innerHTML=s.map(e=>{
+    const idx=all.findIndex(x=>x.fecha===e.fecha&&x.kg===e.kg);
+    const prev=all[idx-1];
+    const ref=prev?prev.kg:IKG;
+    const d=e.kg-ref;
+    const nota=e.nota?`<div class="nota-text" style="margin-top:2px;">${e.nota}</div>`:'';
+    return `<div class="entry-row">
+      <div>
+        <div class="entry-date">${e.fecha}</div>
+        <span class="entry-badge badge-${e.tipo||'semanal'}">${e.tipo||'semanal'}</span>
+      </div>
+      <div style="font-weight:500;">${fmt(e.kg)} kg${nota}</div>
+      <span class="${d<=0?'delta-good':'delta-bad'}">${d<=0?'▼':'▲'} ${fmt(Math.abs(d))} kg</span>
+      <span style="color:#a09e99;">${e.cm?fmt(e.cm,0)+' cm':'—'}</span>
+      <button class="del-btn" onclick="eliminar(${idx})" title="Eliminar">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function guardarRegistro(){
+  const fecha=document.getElementById('inp-fecha').value;
+  const kg=parseFloat(document.getElementById('inp-kg').value);
+  const cm=parseFloat(document.getElementById('inp-cm').value);
+  const tipo=document.getElementById('inp-tipo').value;
+  const nota=document.getElementById('inp-nota').value.trim();
+  if(!fecha||isNaN(kg)){ alert('Ingresá la fecha y el peso.'); return; }
+  if(kg<30||kg>300){ alert('Peso fuera de rango razonable.'); return; }
+  entries.push({fecha,kg,cm:isNaN(cm)?null:cm,tipo,nota});
+  save();
+  document.getElementById('inp-kg').value='';
+  document.getElementById('inp-cm').value='';
+  document.getElementById('inp-nota').value='';
+  const a=document.getElementById('alert-ok');
+  a.style.display='block';
+  setTimeout(()=>a.style.display='none', 2500);
+  renderDashboard();
+}
+
+function eliminar(idx){
+  const all=sorted();
+  const target=all[idx];
+  if(!confirm('¿Eliminar este registro?')) return;
+  entries=entries.filter(e=>!(e.fecha===target.fecha&&e.kg===target.kg));
+  save();
+  renderHistorial();
+  renderDashboard();
+}
+
+function borrarTodo(){
+  if(!confirm('¿Borrar TODOS los registros? Esta acción no se puede deshacer.')) return;
+  entries=[];
+  save();
+  renderHistorial();
+  renderDashboard();
+}
+
+function exportCSV(){
+  const s=sorted();
+  if(s.length===0){ alert('No hay registros para exportar.'); return; }
+  const header='fecha,tipo,peso_kg,cintura_cm,nota';
+  const rows=s.map(e=>`${e.fecha},${e.tipo||''},${e.kg},${e.cm||''},${(e.nota||'').replace(/,/g,' ')}`);
+  const csv=[header,...rows].join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='mi_progreso.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Init
+load();
+document.getElementById('inp-fecha').value=new Date().toISOString().split('T')[0];
+renderDashboard();
+</script>
+</body>
+</html>
